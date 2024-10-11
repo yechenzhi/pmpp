@@ -27,12 +27,12 @@ void stopTime(Timer* timer) {
 }
 
 float elapsedTime(Timer timer) {
-    return ((float) ((timer.end.tv_sec - timer.start.tv_sec) + 
-                    (timer.end.tv_usec - timer.start.tv_usec)/1.0e6));
+    return ((float) ((timer.end.tv_sec - timer.start.tv_sec) * 1000.0 + 
+                    (timer.end.tv_usec - timer.start.tv_usec) / 1000.0));
 }
 
 void printElapsedTime(Timer timer, const char* message, const char* color) {
-    printf("%s%s: %f seconds%s\n", color, message, elapsedTime(timer), RESET);
+    printf("%s%s: %f ms%s\n", color, message, elapsedTime(timer), RESET);
 }
 
 #endif // TIMER_H
