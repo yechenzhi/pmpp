@@ -12,40 +12,32 @@ void scan_cpu(double* input, double* output, unsigned int N) {
     }
 }
 
-// bug version of scan(koggie stone)
-// __global__ void scan_kernel(double* input, double* output, double* partialSums, unsigned int N){
-//     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-//     output[i] = input[i];
-//     __syncthreads();
-//     for(unsigned int stride = 1; stride <= BLOCK_DIM/2;  stride *= 2){
-//         if(threadIdx.x >= stride){
-//             output[i] += output[i-stride];
-//         }
-//         __syncthreads();
-//     }
-//     if(threadIdx.x == BLOCK_DIM - 1){
-//         partialSums[blockIdx.x] = output[i];
-//     }
-// }
-
 __global__ void scan_kernel(double* input, double* output, double* partialSums, unsigned int N){
     unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
-    output[i] = input[i];
+
+    __shared__ double buffer1_s[BLOCK_DIM];
+    __shared__ double buffer2_s[BLOCK_DIM];
+    double* inBuffer_s = buffer1_s;
+    double* outBuffer_s = buffer2_s;
+    inBuffer_s[threadIdx.x] = input[i];
     __syncthreads();
+
     for(unsigned int stride = 1; stride <= BLOCK_DIM/2;  stride *= 2){
-        double v;
         if(threadIdx.x >= stride){
-            v = output[i-stride];
+            outBuffer_s[threadIdx.x] = inBuffer_s[threadIdx.x] + inBuffer_s[threadIdx.x - stride];
+        } else{
+            outBuffer_s[threadIdx.x] = inBuffer_s[threadIdx.x];
         }
         __syncthreads();
-        if(threadIdx.x >= stride){
-            output[i] += v;
-        }
-        __syncthreads();
+        double* tmp = inBuffer_s;
+        inBuffer_s = outBuffer_s;
+        outBuffer_s = tmp;
     }
+
     if(threadIdx.x == BLOCK_DIM - 1){
-        partialSums[blockIdx.x] = output[i];
+        partialSums[blockIdx.x] = inBuffer_s[threadIdx.x];
     }
+    output[i] = inBuffer_s[threadIdx.x];
 }
 
 __global__ void add_kernel(double* output, double* partialSums, unsigned int N){
