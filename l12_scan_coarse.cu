@@ -6,17 +6,17 @@
 #define COARSE_FACTOR 8
 
 // CPU version of scan
-void scan_cpu(double* input, double* output, unsigned int N) {
+void scan_cpu(float* input, float* output, unsigned int N) {
     output[0] = input[0];
     for(unsigned int i = 1; i < N; ++i){
         output[i] = input[i] + output[i-1];
     }
 }
 
-__global__ void scan_kernel(double* input, double* output, double* partialSums, unsigned int N){
+__global__ void scan_kernel(float* input, float* output, float* partialSums, unsigned int N){
     unsigned int bSegment = blockIdx.x*BLOCK_DIM*COARSE_FACTOR;
 
-    __shared__ double buffer_s[BLOCK_DIM*COARSE_FACTOR];
+    __shared__ float buffer_s[BLOCK_DIM*COARSE_FACTOR];
     for(unsigned int c=0; c < COARSE_FACTOR; ++c){
         buffer_s[threadIdx.x+c*BLOCK_DIM] = input[bSegment+c*BLOCK_DIM+threadIdx.x];
     }
@@ -29,10 +29,10 @@ __global__ void scan_kernel(double* input, double* output, double* partialSums, 
     }
     __syncthreads();
 
-    __shared__ double buffer1_s[BLOCK_DIM];
-    __shared__ double buffer2_s[BLOCK_DIM];
-    double* inBuffer_s = buffer1_s;
-    double* outBuffer_s = buffer2_s;
+    __shared__ float buffer1_s[BLOCK_DIM];
+    __shared__ float buffer2_s[BLOCK_DIM];
+    float* inBuffer_s = buffer1_s;
+    float* outBuffer_s = buffer2_s;
     inBuffer_s[threadIdx.x] = buffer_s[tSegment + COARSE_FACTOR - 1];
     __syncthreads();
 
@@ -43,7 +43,7 @@ __global__ void scan_kernel(double* input, double* output, double* partialSums, 
             outBuffer_s[threadIdx.x] = inBuffer_s[threadIdx.x];
         }
         __syncthreads();
-        double* tmp = inBuffer_s;
+        float* tmp = inBuffer_s;
         inBuffer_s = outBuffer_s;
         outBuffer_s = tmp;
     }
@@ -62,7 +62,7 @@ __global__ void scan_kernel(double* input, double* output, double* partialSums, 
     }
 }
 
-__global__ void add_kernel(double* output, double* partialSums, unsigned int N){
+__global__ void add_kernel(float* output, float* partialSums, unsigned int N){
     unsigned int bSegment = blockIdx.x*blockDim.x*COARSE_FACTOR; 
     if(blockIdx.x > 0){
         for(unsigned int c=0; c< COARSE_FACTOR; ++c){
@@ -71,7 +71,7 @@ __global__ void add_kernel(double* output, double* partialSums, unsigned int N){
     }
 }
 
-void scan_gpu_d(double* input_d, double* output_d, unsigned int N){
+void scan_gpu_d(float* input_d, float* output_d, unsigned int N){
     Timer timer; 
 
     // configurations
@@ -81,8 +81,8 @@ void scan_gpu_d(double* input_d, double* output_d, unsigned int N){
 
     // Allocate partial sums 
     startTime(&timer);
-    double *partialSums_d;
-    cudaMalloc((void**) &partialSums_d, numBlocks*sizeof(double));
+    float *partialSums_d;
+    cudaMalloc((void**) &partialSums_d, numBlocks*sizeof(float));
     cudaDeviceSynchronize();
     stopTime(&timer);
     printElapsedTime(timer, "partial sums allocation time",BLUE);
@@ -109,21 +109,21 @@ void scan_gpu_d(double* input_d, double* output_d, unsigned int N){
     printElapsedTime(timer, "deallocation time", BLUE);
 }
 
-void scan_gpu(double* input, double* output, unsigned int N){
+void scan_gpu(float* input, float* output, unsigned int N){
     Timer timer;
 
     // Allocate GPU memory
     startTime(&timer);
-    double *input_d, *output_d;
-    cudaMalloc((void**) &input_d, N*sizeof(double));
-    cudaMalloc((void**) &output_d, N*sizeof(double));
+    float *input_d, *output_d;
+    cudaMalloc((void**) &input_d, N*sizeof(float));
+    cudaMalloc((void**) &output_d, N*sizeof(float));
     cudaDeviceSynchronize();
     stopTime(&timer);
     printElapsedTime(timer, "Allocation time", BLUE);
 
     // Copy data to GPU memory
     startTime(&timer);
-    cudaMemcpy(input_d, input, N*sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(input_d, input, N*sizeof(float), cudaMemcpyHostToDevice);
     cudaDeviceSynchronize();
     stopTime(&timer);
     printElapsedTime(timer, "Copy to GPU time", BLUE);
@@ -141,7 +141,7 @@ void scan_gpu(double* input, double* output, unsigned int N){
 
     // Copy data from GPU memory
     startTime(&timer);
-    cudaMemcpy(output, output_d, N*sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(output, output_d, N*sizeof(float), cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
     stopTime(&timer);
     printElapsedTime(timer, "Copy to CPU time",BLUE);
@@ -152,17 +152,17 @@ void scan_gpu(double* input, double* output, unsigned int N){
 }
 
 int main(int argc, char** argv) {
-    int N = BLOCK_DIM*BLOCK_DIM*100;
+    int N = BLOCK_DIM*BLOCK_DIM*10;
     // int N = BLOCK_DIM*100;
 
     // Allocate memory for RGB and gray images
-    double* input = (double*) malloc(N * sizeof(double));
-    double* output_cpu = (double*) malloc(N * sizeof(double));
-    double* output_gpu = (double*) malloc(N * sizeof(double));
+    float* input = (float*) malloc(N * sizeof(float));
+    float* output_cpu = (float*) malloc(N * sizeof(float));
+    float* output_gpu = (float*) malloc(N * sizeof(float));
 
     // Initialize RGB arrays with some values
     for (unsigned int i = 0; i < N; ++i) {
-        input[i] = (double)rand() / (double)RAND_MAX;
+        input[i] = (float)rand() / (float)RAND_MAX;
     }
     
 
@@ -182,9 +182,9 @@ int main(int argc, char** argv) {
     printElapsedTime(timer, "GPU scan", GREEN);
 
     // Verify results
-    double maxError = 0.0f;
+    float maxError = 0.0f;
     for (unsigned int i = 0; i < N; ++i) {
-        double error = fabs(output_cpu[i] - output_gpu[i]);
+        float error = fabs(output_cpu[i] - output_gpu[i]);
         if (error > maxError) {
             maxError = error;
         }
