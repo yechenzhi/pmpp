@@ -62,11 +62,11 @@ void spmv_csr_gpu(CSRMatrix csrMatrix, float* inVector, float* outVector){
 
     // Copy data to GPU memory
     startTime(&timer);
-    cudaMemcpy(csrMatrix_d.rowPtrs, csrMatrix_d.rowPtrs, (csrMatrix_d.numRows + 1) * sizeof(unsigned int), cudaMemcpyHostToDevice);
-    cudaMemcpy(csrMatrix_d.colIdxs, csrMatrix_d.colIdxs, csrMatrix_d.numNonzeros * sizeof(unsigned int), cudaMemcpyHostToDevice);
-    cudaMemcpy(csrMatrix_d.values, csrMatrix_d.values, csrMatrix_d.numNonzeros * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(inVector_d, inVector, csrMatrix_d.numCols * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemset(outVector_d, 0, csrMatrix_d.numRows * sizeof(float));
+    cudaMemcpy(csrMatrix_d.rowPtrs, csrMatrix.rowPtrs, (csrMatrix_d.numRows + 1) * sizeof(unsigned int), cudaMemcpyHostToDevice);
+    cudaMemcpy(csrMatrix_d.colIdxs, csrMatrix.colIdxs, csrMatrix_d.numNonzeros * sizeof(unsigned int), cudaMemcpyHostToDevice);
+    cudaMemcpy(csrMatrix_d.values, csrMatrix.values, csrMatrix_d.numNonzeros * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(inVector_d, inVector, csrMatrix.numCols * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemset(outVector_d, 0, csrMatrix.numRows * sizeof(float));
     cudaDeviceSynchronize();
     stopTime(&timer);
     printElapsedTime(timer, "Copy to GPU time",BLUE);
@@ -138,8 +138,8 @@ int main(int argc, char** argv) {
     unsigned int numRows = 10000;
     unsigned int numCols = 10000;
     unsigned int numNonzeros = 100000;
-    CSRMatrix CsrMatrix;
-    initializeSparseMatrix(&CsrMatrix, numRows, numCols, numNonzeros);
+    CSRMatrix csrMatrix;
+    initializeSparseMatrix(&csrMatrix, numRows, numCols, numNonzeros);
 
     // Initialize input vector
     float* inVector = (float*) malloc(numCols * sizeof(float));
@@ -153,13 +153,13 @@ int main(int argc, char** argv) {
 
     // CPU version
     startTime(&timer);
-    spmv_csr_cpu(CsrMatrix, inVector, outVector_cpu);
+    spmv_csr_cpu(csrMatrix, inVector, outVector_cpu);
     stopTime(&timer);
     printElapsedTime(timer, "CPU merge", GREEN);
 
     // GPU version
     startTime(&timer);
-    spmv_csr_gpu(CsrMatrix, inVector, outVector_gpu);
+    spmv_csr_gpu(csrMatrix, inVector, outVector_gpu);
     cudaDeviceSynchronize();
     stopTime(&timer);
     printElapsedTime(timer, "GPU merge", GREEN);
@@ -175,9 +175,9 @@ int main(int argc, char** argv) {
     printf("Max error: %f\n", maxError);
 
     // Free memory
-    free(CsrMatrix.rowPtrs);
-    free(CsrMatrix.colIdxs);
-    free(CsrMatrix.values);
+    free(csrMatrix.rowPtrs);
+    free(csrMatrix.colIdxs);
+    free(csrMatrix.values);
     free(inVector);
     free(outVector_cpu);
     free(outVector_gpu);
